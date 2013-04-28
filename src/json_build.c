@@ -469,7 +469,10 @@ build_json_object(PG_FUNCTION_ARGS)
 		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i))
 		{
 			val_type = TEXTOID;
-			arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
+			if (PG_ARGISNULL(i))
+				arg = (Datum)0;
+			else
+				arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
 		}
 		else
 		{
@@ -492,7 +495,10 @@ build_json_object(PG_FUNCTION_ARGS)
 		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i+1))
 		{
 			val_type = TEXTOID;
-			arg = CStringGetTextDatum(PG_GETARG_POINTER(i+1));
+			if (PG_ARGISNULL(i+1))
+				arg = (Datum)0;
+			else
+				arg = CStringGetTextDatum(PG_GETARG_POINTER(i+1));
 		}
 		else
 		{
@@ -541,7 +547,10 @@ build_json_array(PG_FUNCTION_ARGS)
 		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i))
 		{
 			val_type = TEXTOID;
-			arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
+			if (PG_ARGISNULL(i))
+				arg = (Datum)0;
+			else
+				arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
 		}
 		else
 		{
