@@ -2,7 +2,7 @@
    "name": "json_build",
    "abstract": "Functions to help build JSON objects",
    "description": "Helper functions to make it easier to build complex json objects.",
-   "version": "0.0.1",
+   "version": "1.0.0",
    "maintainer": [
       "Andrew Dunstan <andrew@dunslane.net>"
    ],
@@ -12,13 +12,13 @@
          "abstract": "Functions to help build JSON objects",
          "file": "sql/json_build.sql",
          "docfile": "doc/json_build.md",
-         "version": "0.0.1"
+         "version": "1.0.0"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "9.2.0"
+            "PostgreSQL": ">= 9.2.0"
          }
       }
    },
