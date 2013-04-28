@@ -6,7 +6,7 @@ DOCS         = $(wildcard doc/*.md)
 USE_MODULE_DB = 1
 TESTS        = $(wildcard test/sql/*.sql)
 REGRESS_OPTS = --inputdir=test --outputdir=test \
-	  --load-extension=$(EXTENSION)\
+	--load-extension=$(EXTENSION)
 REGRESS      = $(patsubst test/sql/%.sql,%,$(TESTS))
 MODULE_big      = $(EXTENSION)
 OBJS         = $(patsubst src/%.c,src/%.o,$(wildcard src/*.c))
