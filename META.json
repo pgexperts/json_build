@@ -1,0 +1,46 @@
+{
+   "name": "json_build",
+   "abstract": "Functions to help build JSON objects",
+   "description": "Helper functions to make it easier to build complex json objects.",
+   "version": "0.0.1",
+   "maintainer": [
+      "Andrew Dunstan <andrew@dunslane.net>"
+   ],
+   "license": "postgresql",
+   "provides": {
+      "json_build": {
+         "abstract": "Functions to help build JSON objects",
+         "file": "sql/json_build.sql",
+         "docfile": "doc/json_build.md",
+         "version": "0.0.1"
+      }
+   },
+   "prereqs": {
+      "runtime": {
+         "requires": {
+            "PostgreSQL": "9.2.0"
+         }
+      }
+   },
+   "resources": {
+      "repository": {
+        "url":  "https://github.com/pgexperts/json_build.git",
+        "web":  "https://github.com/pgexperts/json_build",
+        "type": "git"
+      },
+   	  "bugtracker": {
+        "web": "https://github.com/pgexperts/json_build/issues"
+      }		    
+   },
+   "generated_by": "Andrew Dunstan",
+   "meta-spec": {
+      "version": "1.0.0",
+      "url": "http://pgxn.org/meta/spec.txt"
+   },
+   "tags": [
+      "json",
+      "build",
+      "array",
+      "object"
+   ]
+}
