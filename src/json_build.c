@@ -12,7 +12,9 @@
 #include "postgres.h"
 
 #include "fmgr.h"
+#if PG_VERSION_NUM >= 90300
 #include "access/htup_details.h"
+#endif
 #include "access/transam.h"
 #include "catalog/pg_cast.h"
 #include "catalog/pg_type.h"
@@ -397,7 +399,11 @@ add_json(Datum orig_val, bool is_null, StringInfo result, Oid val_type, bool key
 	else
 		tcategory = TypeCategory(val_type);
 	
-	if (key_scalar && (tcategory == TYPCATEGORY_ARRAY || tcategory == TYPCATEGORY_COMPOSITE || tcategory ==  TYPCATEGORY_JSON || tcategory == TYPCATEGORY_JSON_CAST))
+	if (key_scalar && 
+		(tcategory == TYPCATEGORY_ARRAY || 
+		 tcategory == TYPCATEGORY_COMPOSITE || 
+		 tcategory ==  TYPCATEGORY_JSON || 
+		 tcategory == TYPCATEGORY_JSON_CAST))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("key value must be scalar, not array, composite or json")));
@@ -448,27 +454,54 @@ build_json_object(PG_FUNCTION_ARGS)
 
 	for (i = 0; i < nargs; i += 2)
 	{
+
+		/* process key */
+
 		if (PG_ARGISNULL(i))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("arg %d: key cannot be null", i+1)));
 		val_type = get_fn_expr_argtype(fcinfo->flinfo, i);
+		/* 
+		 * turn a constant (more or less literal) value that's of unknown
+		 * type into text. Unknowns come in as a cstring pointer.
+		 */
+		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i))
+		{
+			val_type = TEXTOID;
+			arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
+		}
+		else
+		{
+			arg = PG_GETARG_DATUM(i);
+		}
 		if (val_type == InvalidOid || val_type == UNKNOWNOID)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("arg %d: could not determine data type",i+1)));
 		appendStringInfoString(result,sep);
 		sep = ", ";
-		arg = PG_GETARG_DATUM(i);
 		add_json(arg, false, result, val_type, true);
+
 		appendStringInfoString(result," : ");
 
+		/* process value */
+
 		val_type = get_fn_expr_argtype(fcinfo->flinfo, i+1);
+		/* see comments above */
+		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i+1))
+		{
+			val_type = TEXTOID;
+			arg = CStringGetTextDatum(PG_GETARG_POINTER(i+1));
+		}
+		else
+		{
+			arg = PG_GETARG_DATUM(i+1);
+		}
 		if (val_type == InvalidOid || val_type == UNKNOWNOID)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("arg %d: could not determine data type",i+2)));
-		arg = PG_GETARG_DATUM(i+1);
 		add_json(arg, PG_ARGISNULL(i+1), result, val_type, false);
 
 	}
@@ -503,13 +536,23 @@ build_json_array(PG_FUNCTION_ARGS)
 	for (i = 0; i < nargs; i ++)
 	{
 		val_type = get_fn_expr_argtype(fcinfo->flinfo, i);
+		arg = PG_GETARG_DATUM(i+1);
+		/* see comments in build_json_object above */
+		if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, i))
+		{
+			val_type = TEXTOID;
+			arg = CStringGetTextDatum(PG_GETARG_POINTER(i));
+		}
+		else
+		{
+			arg = PG_GETARG_DATUM(i);
+		}
 		if (val_type == InvalidOid || val_type == UNKNOWNOID)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("arg %d: could not determine data type",i+1)));
 		appendStringInfoString(result,sep);
 		sep = ", ";
-		arg = PG_GETARG_DATUM(i);
 		add_json(arg, PG_ARGISNULL(i), result, val_type, false);
 	}
 	appendStringInfoChar(result,']');
