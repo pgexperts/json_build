@@ -8,16 +8,23 @@ The functions are:
 * `build_json_object (VARIADIC "any")`
 * `build_json_array (VARIADIC "any")`
 
-Both functions return JSON. They can be called nested and combined, to build up complex tree structured JSON.
+Both functions return JSON. They can be called nested and combined, to build 
+up complex tree structured JSON.
 
-`VARIADIC  "any"` means that the functions will accept any number of arguments of any type, and Postgres will accept the call, although the functions
-themselves do enforce certain rules
+`VARIADIC  "any"` means that the functions will accept any number of arguments 
+of any type, and Postgres will accept the call, although the functions
+themselves do enforce certain rules. If called with no arguments an empty 
+object or array is returned.
 
-If an argument is an array, it is converted to a JSON array, if it is a record, it is converted to a JSON object, if it is JSON it is passed through as is.
+If an argument is an array, it is converted to a JSON array, if it is a record,
+it is converted to a JSON object, if it is JSON it is passed through as is.
 
-Object keys must be not null and scalar - use of arrays, records or JSON values as keys is forbidden. 
-`build_json_object` must get an even number of arguments - the odd numbered arguments (counting from 1) are the keys and the 
-following even numbered arguments are the corresponding values.
+Object keys must be not null and scalar - use of arrays, records or JSON values
+as keys is forbidden. 
+
+`build_json_object` must get an even number of arguments - the odd numbered 
+arguments (counting from 1) are the keys and the following even numbered 
+arguments are the corresponding values.
 
 Examples:
 
