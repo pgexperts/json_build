@@ -19,3 +19,32 @@ SELECT build_json_object(
  {"a" : {"b" : false, "c" : 99}, "d" : {"e" : [9,8,7], "f" : {"relkind":"r","name":"pg_class"}}}
 (1 row)
 
+-- empty objects/arrays
+SELECT build_json_array();
+ build_json_array 
+------------------
+ []
+(1 row)
+
+SELECT build_json_object();
+ build_json_object 
+-------------------
+ {}
+(1 row)
+
+-- make sure keys are quoted
+SELECT build_json_object(1,2);
+ build_json_object 
+-------------------
+ {"1" : 2}
+(1 row)
+
+-- keys must be scalar and not null
+SELECT build_json_object(null,2);
+ERROR:  arg 1: key cannot be null
+SELECT build_json_object(r,2) FROM (SELECT 1 AS a, 2 AS b) r;
+ERROR:  key value must be scalar, not array, composite or json
+SELECT build_json_object(json '{"a":1,"b":2}', 3);
+ERROR:  key value must be scalar, not array, composite or json
+SELECT build_json_object('{1,2,3}'::int[], 3);
+ERROR:  key value must be scalar, not array, composite or json
