@@ -22,3 +22,20 @@ CREATE FUNCTION build_json_array()
 RETURNS json
 AS 'select json $$[]$$ '
 LANGUAGE SQL IMMUTABLE;
+
+
+CREATE FUNCTION json_object_agg_transfn(internal, text, anyelement)
+RETURNS internal
+AS 'MODULE_PATHNAME'
+LANGUAGE C IMMUTABLE;
+
+CREATE FUNCTION json_object_agg_finalfn(internal)
+RETURNS json
+AS 'MODULE_PATHNAME'
+LANGUAGE C IMMUTABLE;
+
+CREATE AGGREGATE json_object_agg(text, anyelement) (
+    SFUNC = json_object_agg_transfn,
+    FINALFUNC = json_object_agg_finalfn,
+    STYPE = internal
+);

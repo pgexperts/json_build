@@ -569,3 +569,151 @@ build_json_array(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(result->data, result->len));
 	
 }
+
+extern Datum json_object_agg_transfn(PG_FUNCTION_ARGS);
+
+PG_FUNCTION_INFO_V1(json_object_agg_transfn);
+
+Datum
+json_object_agg_transfn(PG_FUNCTION_ARGS)
+{
+    Oid         val_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
+    MemoryContext aggcontext,
+                oldcontext;
+    StringInfo  state;
+    Datum       orig_val,
+                val;
+    TYPCATEGORY tcategory;
+    Oid         typoutput;
+    bool        typisvarlena;
+    Oid         castfunc = InvalidOid;
+	char       *field_name;
+
+    if (val_type == InvalidOid)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("could not determine input data type")));
+
+    if (!AggCheckCallContext(fcinfo, &aggcontext))
+    {
+        /* cannot be called directly because of internal-type argument */
+        elog(ERROR, "json_agg_transfn called in non-aggregate context");
+    }
+
+    if (PG_ARGISNULL(0))
+    {
+        /*
+         * Make this StringInfo in a context where it will persist for the
+         * duration off the aggregate call. It's only needed for this initial
+         * piece, as the StringInfo routines make sure they use the right
+         * context to enlarge the object if necessary.
+         */
+        oldcontext = MemoryContextSwitchTo(aggcontext);
+        state = makeStringInfo();
+        MemoryContextSwitchTo(oldcontext);
+
+        appendStringInfoString(state, "{ ");
+    }
+    else
+    {
+        state = (StringInfo) PG_GETARG_POINTER(0);
+        appendStringInfoString(state, ", ");
+    }
+
+    if (PG_ARGISNULL(1))
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("field name must not be null")));
+
+	field_name=text_to_cstring(PG_GETARG_TEXT_PP(1));
+
+	if (*field_name == '\0')
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("field name must not be an empty string")));
+
+	escape_json(state, field_name);
+
+	appendStringInfoString(state, ": ");
+
+	orig_val = PG_GETARG_DATUM(2);
+
+	getTypeOutputInfo(val_type, &typoutput, &typisvarlena);
+
+	if (val_type > FirstNormalObjectId)
+	{
+		HeapTuple	tuple;
+		Form_pg_cast castForm;
+
+		tuple = SearchSysCache2(CASTSOURCETARGET,
+								ObjectIdGetDatum(val_type),
+								ObjectIdGetDatum(JSONOID));
+		if (HeapTupleIsValid(tuple))
+		{
+			castForm = (Form_pg_cast) GETSTRUCT(tuple);
+
+			if (castForm->castmethod == COERCION_METHOD_FUNCTION)
+				castfunc = typoutput = castForm->castfunc;
+
+			ReleaseSysCache(tuple);
+		}
+	}
+
+	if (castfunc != InvalidOid)
+		tcategory = TYPCATEGORY_JSON_CAST;
+	else if (val_type == RECORDARRAYOID)
+		tcategory = TYPCATEGORY_ARRAY;
+	else if (val_type == RECORDOID)
+		tcategory = TYPCATEGORY_COMPOSITE;
+	else if (val_type == JSONOID)
+		tcategory = TYPCATEGORY_JSON;
+	else
+		tcategory = TypeCategory(val_type);
+
+	/*
+	 * If we have a toasted datum, forcibly detoast it here to avoid memory
+	 * leakage inside the type's output routine.
+	 */
+	if (typisvarlena)
+		val = PointerGetDatum(PG_DETOAST_DATUM(orig_val));
+	else
+		val = orig_val;
+
+	if (!PG_ARGISNULL(0) &&
+	  (tcategory == TYPCATEGORY_ARRAY || tcategory == TYPCATEGORY_COMPOSITE))
+	{
+		appendStringInfoString(state, "\n ");
+	}
+
+	datum_to_json(val, false, state, tcategory, typoutput, false);
+
+	/* Clean up detoasted copy, if any */
+	if (val != orig_val)
+		pfree(DatumGetPointer(val));
+
+	PG_RETURN_POINTER(state);
+}
+
+extern Datum json_object_agg_finalfn(PG_FUNCTION_ARGS);
+
+PG_FUNCTION_INFO_V1(json_object_agg_finalfn);
+
+Datum
+json_object_agg_finalfn(PG_FUNCTION_ARGS)
+{
+    StringInfo  state;
+
+    /* cannot be called directly because of internal-type argument */
+    Assert(AggCheckCallContext(fcinfo, NULL));
+
+    state = PG_ARGISNULL(0) ? NULL : (StringInfo) PG_GETARG_POINTER(0);
+
+    if (state == NULL)
+        PG_RETURN_TEXT_P(cstring_to_text("{}"));
+
+    appendStringInfoString(state, " }");
+
+    PG_RETURN_TEXT_P(cstring_to_text(state->data));
+}
+
+
