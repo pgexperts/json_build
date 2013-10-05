@@ -577,22 +577,11 @@ PG_FUNCTION_INFO_V1(json_object_agg_transfn);
 Datum
 json_object_agg_transfn(PG_FUNCTION_ARGS)
 {
-    Oid         val_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
+    Oid         val_type;
     MemoryContext aggcontext,
                 oldcontext;
     StringInfo  state;
-    Datum       orig_val,
-                val;
-    TYPCATEGORY tcategory;
-    Oid         typoutput;
-    bool        typisvarlena;
-    Oid         castfunc = InvalidOid;
-	char       *field_name;
-
-    if (val_type == InvalidOid)
-        ereport(ERROR,
-                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("could not determine input data type")));
+    Datum       arg;
 
     if (!AggCheckCallContext(fcinfo, &aggcontext))
     {
@@ -620,76 +609,57 @@ json_object_agg_transfn(PG_FUNCTION_ARGS)
         appendStringInfoString(state, ", ");
     }
 
-    if (PG_ARGISNULL(1))
+	if (PG_ARGISNULL(1))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("field name must not be null")));
 
-	field_name=text_to_cstring(PG_GETARG_TEXT_PP(1));
 
-	if (*field_name == '\0')
+	val_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
+	/* 
+	 * turn a constant (more or less literal) value that's of unknown
+	 * type into text. Unknowns come in as a cstring pointer.
+	 */
+	if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, 1))
+	{
+		val_type = TEXTOID;
+		arg = CStringGetTextDatum(PG_GETARG_POINTER(1));
+	}
+	else
+	{
+		arg = PG_GETARG_DATUM(1);
+	}
+
+	if (val_type == InvalidOid || val_type == UNKNOWNOID)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("field name must not be an empty string")));
+				 errmsg("arg 1: could not determine data type")));
 
-	escape_json(state, field_name);
+	add_json(arg, false, state, val_type, true);
+	
+	appendStringInfoString(state," : ");
 
-	appendStringInfoString(state, ": ");
-
-	orig_val = PG_GETARG_DATUM(2);
-
-	getTypeOutputInfo(val_type, &typoutput, &typisvarlena);
-
-	if (val_type > FirstNormalObjectId)
+	val_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
+	/* see comments above */
+	if (val_type == UNKNOWNOID && get_fn_expr_arg_stable(fcinfo->flinfo, 2))
 	{
-		HeapTuple	tuple;
-		Form_pg_cast castForm;
-
-		tuple = SearchSysCache2(CASTSOURCETARGET,
-								ObjectIdGetDatum(val_type),
-								ObjectIdGetDatum(JSONOID));
-		if (HeapTupleIsValid(tuple))
-		{
-			castForm = (Form_pg_cast) GETSTRUCT(tuple);
-
-			if (castForm->castmethod == COERCION_METHOD_FUNCTION)
-				castfunc = typoutput = castForm->castfunc;
-
-			ReleaseSysCache(tuple);
-		}
+		val_type = TEXTOID;
+		if (PG_ARGISNULL(2))
+			arg = (Datum)0;
+		else
+			arg = CStringGetTextDatum(PG_GETARG_POINTER(2));
+	}
+	else
+	{
+		arg = PG_GETARG_DATUM(2);
 	}
 
-	if (castfunc != InvalidOid)
-		tcategory = TYPCATEGORY_JSON_CAST;
-	else if (val_type == RECORDARRAYOID)
-		tcategory = TYPCATEGORY_ARRAY;
-	else if (val_type == RECORDOID)
-		tcategory = TYPCATEGORY_COMPOSITE;
-	else if (val_type == JSONOID)
-		tcategory = TYPCATEGORY_JSON;
-	else
-		tcategory = TypeCategory(val_type);
+	if (val_type == InvalidOid || val_type == UNKNOWNOID)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("arg 2: could not determine data type")));
 
-	/*
-	 * If we have a toasted datum, forcibly detoast it here to avoid memory
-	 * leakage inside the type's output routine.
-	 */
-	if (typisvarlena)
-		val = PointerGetDatum(PG_DETOAST_DATUM(orig_val));
-	else
-		val = orig_val;
-
-	if (!PG_ARGISNULL(0) &&
-	  (tcategory == TYPCATEGORY_ARRAY || tcategory == TYPCATEGORY_COMPOSITE))
-	{
-		appendStringInfoString(state, "\n ");
-	}
-
-	datum_to_json(val, false, state, tcategory, typoutput, false);
-
-	/* Clean up detoasted copy, if any */
-	if (val != orig_val)
-		pfree(DatumGetPointer(val));
+	add_json(arg, PG_ARGISNULL(2), state, val_type, false);
 
 	PG_RETURN_POINTER(state);
 }

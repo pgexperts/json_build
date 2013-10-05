@@ -26,3 +26,11 @@ SELECT build_json_object(json '{"a":1,"b":2}', 3);
 
 SELECT build_json_object('{1,2,3}'::int[], 3);
 
+CREATE TEMP TABLE foo (serial int, name text, type text);
+INSERT INTO foo VALUES (847001,'t15','GE1043');
+INSERT INTO foo VALUES (847002,'t16','GE1043');
+INSERT INTO foo VALUES (847003,'sub-alpha','GESS90');
+
+SELECT build_json_object('turbines',json_object_agg(serial,build_json_object('name',name,'type',type)))
+FROM foo;
+

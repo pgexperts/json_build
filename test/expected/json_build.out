@@ -48,3 +48,14 @@ SELECT build_json_object(json '{"a":1,"b":2}', 3);
 ERROR:  key value must be scalar, not array, composite or json
 SELECT build_json_object('{1,2,3}'::int[], 3);
 ERROR:  key value must be scalar, not array, composite or json
+CREATE TEMP TABLE foo (serial int, name text, type text);
+INSERT INTO foo VALUES (847001,'t15','GE1043');
+INSERT INTO foo VALUES (847002,'t16','GE1043');
+INSERT INTO foo VALUES (847003,'sub-alpha','GESS90');
+SELECT build_json_object('turbines',json_object_agg(serial,build_json_object('name',name,'type',type)))
+FROM foo;
+                                                                            build_json_object                                                                            
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"turbines" : { "847001" : {"name" : "t15", "type" : "GE1043"}, "847002" : {"name" : "t16", "type" : "GE1043"}, "847003" : {"name" : "sub-alpha", "type" : "GESS90"} }}
+(1 row)
+
