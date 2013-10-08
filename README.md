@@ -7,8 +7,9 @@ The functions are:
 
 * `build_json_object (VARIADIC "any")`
 * `build_json_array (VARIADIC "any")`
+* `json_object_agg  ("any", "any")`
 
-Both functions return JSON. They can be called nested and combined, to build 
+All the functions return JSON. They can be called nested and combined, to build 
 up complex tree structured JSON.
 
 `VARIADIC  "any"` means that the functions will accept any number of arguments 
@@ -26,13 +27,15 @@ as keys is forbidden.
 arguments (counting from 1) are the keys and the following even numbered 
 arguments are the corresponding values.
 
+`json_object_agg` aggregates any two columns into a json object.
+
 Examples:
 
     SELECT build_json_object( 
            'a', build_json_object('b',false,'c',99), 
            'd', build_json_object('e',array[9,8,7]::int[],
-               'f', (select row_to_json(r) from ( select relkind, oid::regclass as name 
-                                                  from pg_class where relname = 'pg_class') r)));
+               'f', (select row_to_json(r) from ( SELECT relkind, oid::regclass as name 
+                                                  FROM pg_class WHERE relname = 'pg_class') r)));
                                             build_json_object                                        
     -------------------------------------------------------------------------------------------------
      {"a" : {"b" : false, "c" : 99}, "d" : {"e" : [9,8,7], "f" : {"relkind":"r","name":"pg_class"}}}
@@ -43,3 +46,12 @@ Examples:
     -----------------------------------------------------------------------
      ["a", 1, "b", 1.2, "c", true, "d", null, "e", {"x": 3, "y": [1,2,3]}]
     (1 row)
+
+    SELECT build_json_object('stuff',json_object_agg(k,v)) 
+    FROM (values ('k1','v1'),('k2','v2')) AS x(k,v);
+                build_json_object             
+    ------------------------------------------
+     {"stuff" : { "k1" : "v1", "k2" : "v2" }}
+
+
+
