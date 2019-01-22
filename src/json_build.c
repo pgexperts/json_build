@@ -39,7 +39,7 @@ static void array_dim_to_json(StringInfo result, int dim, int ndims, int *dims,
 static void array_to_json_internal(Datum array, StringInfo result,
 								   bool use_line_feeds);
 
-/* 
+/*
  * All the defined  type categories are upper case , so use lower case here
  * so we avoid any possible clash.
  */
@@ -286,51 +286,51 @@ composite_to_json(Datum composite, StringInfo result, bool use_line_feeds)
 		bool		typisvarlena;
 		Oid         castfunc = InvalidOid;
 
-		if (tupdesc->attrs[i]->attisdropped)
+		if (TupleDescAttr(tupdesc, i)->attisdropped)
 			continue;
 
 		if (needsep)
 			appendStringInfoString(result, sep);
 		needsep = true;
 
-		attname = NameStr(tupdesc->attrs[i]->attname);
+		attname = NameStr(TupleDescAttr(tupdesc, i)->attname);
 		escape_json(result, attname);
 		appendStringInfoChar(result, ':');
 
 		origval = heap_getattr(tuple, i + 1, tupdesc, &isnull);
 
-		getTypeOutputInfo(tupdesc->attrs[i]->atttypid,
+		getTypeOutputInfo(TupleDescAttr(tupdesc, i)->atttypid,
 						  &typoutput, &typisvarlena);
 
-		if (tupdesc->attrs[i]->atttypid > FirstNormalObjectId)
+		if (TupleDescAttr(tupdesc, i)->atttypid > FirstNormalObjectId)
 		{
 		    HeapTuple   cast_tuple;
 			Form_pg_cast castForm;
-			
+
 			cast_tuple = SearchSysCache2(CASTSOURCETARGET,
-										 ObjectIdGetDatum(tupdesc->attrs[i]->atttypid),
+										 ObjectIdGetDatum(TupleDescAttr(tupdesc, i)->atttypid),
 										 ObjectIdGetDatum(JSONOID));
 			if (HeapTupleIsValid(cast_tuple))
 			{
 				castForm = (Form_pg_cast) GETSTRUCT(cast_tuple);
-				
+
 				if (castForm->castmethod == COERCION_METHOD_FUNCTION)
 					castfunc = typoutput = castForm->castfunc;
-				
+
 				ReleaseSysCache(cast_tuple);
 			}
 		}
 
 		if (castfunc != InvalidOid)
 			tcategory = TYPCATEGORY_JSON_CAST;
-		else if (tupdesc->attrs[i]->atttypid == RECORDARRAYOID)
+		else if (TupleDescAttr(tupdesc, i)->atttypid == RECORDARRAYOID)
 			tcategory = TYPCATEGORY_ARRAY;
-		else if (tupdesc->attrs[i]->atttypid == RECORDOID)
+		else if (TupleDescAttr(tupdesc, i)->atttypid == RECORDOID)
 			tcategory = TYPCATEGORY_COMPOSITE;
-		else if (tupdesc->attrs[i]->atttypid == JSONOID)
+		else if (TupleDescAttr(tupdesc, i)->atttypid == JSONOID)
 			tcategory = TYPCATEGORY_JSON;
 		else
-			tcategory = TypeCategory(tupdesc->attrs[i]->atttypid);
+			tcategory = TypeCategory(TupleDescAttr(tupdesc, i)->atttypid);
 
 		/*
 		 * If we have a toasted datum, forcibly detoast it here to avoid
@@ -398,16 +398,16 @@ add_json(Datum orig_val, bool is_null, StringInfo result, Oid val_type, bool key
 		tcategory = TYPCATEGORY_JSON;
 	else
 		tcategory = TypeCategory(val_type);
-	
-	if (key_scalar && 
-		(tcategory == TYPCATEGORY_ARRAY || 
-		 tcategory == TYPCATEGORY_COMPOSITE || 
-		 tcategory ==  TYPCATEGORY_JSON || 
+
+	if (key_scalar &&
+		(tcategory == TYPCATEGORY_ARRAY ||
+		 tcategory == TYPCATEGORY_COMPOSITE ||
+		 tcategory ==  TYPCATEGORY_JSON ||
 		 tcategory == TYPCATEGORY_JSON_CAST))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("key value must be scalar, not array, composite or json")));
-		
+
 	/*
 	 * If we have a toasted datum, forcibly detoast it here to avoid
 	 * memory leakage inside the type's output routine.
@@ -416,7 +416,7 @@ add_json(Datum orig_val, bool is_null, StringInfo result, Oid val_type, bool key
 		val = PointerGetDatum(PG_DETOAST_DATUM(orig_val));
 	else
 		val = orig_val;
-	
+
 	datum_to_json(val, is_null, result, tcategory, typoutput, key_scalar);
 
 	/* Clean up detoasted copy, if any */
@@ -441,7 +441,7 @@ build_json_object(PG_FUNCTION_ARGS)
 	char *sep = "";
     StringInfo  result;
 	Oid val_type;
-	
+
 
 	if (nargs % 2 != 0)
 		ereport(ERROR,
@@ -462,7 +462,7 @@ build_json_object(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("arg %d: key cannot be null", i+1)));
 		val_type = get_fn_expr_argtype(fcinfo->flinfo, i);
-		/* 
+		/*
 		 * turn a constant (more or less literal) value that's of unknown
 		 * type into text. Unknowns come in as a cstring pointer.
 		 */
@@ -514,7 +514,7 @@ build_json_object(PG_FUNCTION_ARGS)
 	appendStringInfoChar(result,'}');
 
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(result->data, result->len));
-	
+
 }
 
 /*
@@ -533,7 +533,7 @@ build_json_array(PG_FUNCTION_ARGS)
 	char *sep = "";
     StringInfo  result;
 	Oid val_type;
-	
+
 
     result = makeStringInfo();
 
@@ -567,7 +567,7 @@ build_json_array(PG_FUNCTION_ARGS)
 	appendStringInfoChar(result,']');
 
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(result->data, result->len));
-	
+
 }
 
 extern Datum json_object_agg_transfn(PG_FUNCTION_ARGS);
@@ -616,7 +616,7 @@ json_object_agg_transfn(PG_FUNCTION_ARGS)
 
 
 	val_type = get_fn_expr_argtype(fcinfo->flinfo, 1);
-	/* 
+	/*
 	 * turn a constant (more or less literal) value that's of unknown
 	 * type into text. Unknowns come in as a cstring pointer.
 	 */
@@ -636,7 +636,7 @@ json_object_agg_transfn(PG_FUNCTION_ARGS)
 				 errmsg("arg 1: could not determine data type")));
 
 	add_json(arg, false, state, val_type, true);
-	
+
 	appendStringInfoString(state," : ");
 
 	val_type = get_fn_expr_argtype(fcinfo->flinfo, 2);
@@ -685,5 +685,3 @@ json_object_agg_finalfn(PG_FUNCTION_ARGS)
 
     PG_RETURN_TEXT_P(cstring_to_text(state->data));
 }
-
-
